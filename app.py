@@ -19,6 +19,7 @@ if uploaded_file:
     wb = openpyxl.load_workbook(uploaded_file, data_only=True)
     output = []
 
+    # 元データ抽出
     for sheet in wb.sheetnames:
         ws = wb[sheet]
         process = ws["D2"].value if ws["D2"].value else ""
@@ -71,9 +72,11 @@ if uploaded_file:
     st.subheader("元データ（ID割り振り済）")
     st.dataframe(df)
 
+    # グラフ用ラベルと色分けカテゴリ
     df["ラベル"] = "ID:" + df["ID"].astype(str) + " | " + df["作業位置"].fillna("なし") + " | " + df["要素作業"] + " | " + df["時間"].astype(str) + "秒"
     df["色分けカテゴリ"] = df["作業位置"].where(df["作業位置"].notna(), df["要素作業"])
 
+    # 初期グラフ
     fig = px.bar(
         df,
         x="工程",
@@ -84,16 +87,10 @@ if uploaded_file:
         title="工程別作業時間（作業位置または要素作業ごとに積み上げ）"
     )
     fig.update_traces(marker=dict(line=dict(color="black", width=1)))
-    fig.update_layout(
-        barmode="stack",
-        xaxis_title="工程",
-        yaxis_title="時間",
-        showlegend=False,
-        height=600,
-        margin=dict(l=40, r=40, t=60, b=40)
-    )
+    fig.update_layout(barmode="stack", xaxis_title="工程", yaxis_title="時間", showlegend=False, height=600)
     st.plotly_chart(fig, use_container_width=True)
 
+    # ID移動機能
     st.subheader("IDごとに移動先工程を指定（直接入力）")
     id_input = st.text_input("移動したいIDをカンマ区切りで入力してください（例: 1,2,5）")
 
@@ -121,6 +118,7 @@ if uploaded_file:
 
         st.success(f"{len(move_targets)} 件のIDの移動を実行しました。")
 
+        # ラベルと色分けカテゴリを再計算
         df["ラベル"] = "ID:" + df["ID"].astype(str) + " | " + df["作業位置"].fillna("なし") + " | " + df["要素作業"] + " | " + df["時間"].astype(str) + "秒"
         df["色分けカテゴリ"] = df["作業位置"].where(df["作業位置"].notna(), df["要素作業"])
 
@@ -134,21 +132,14 @@ if uploaded_file:
             title="更新後の工程別作業時間（作業位置または要素作業ごとに積み上げ）"
         )
         fig_updated.update_traces(marker=dict(line=dict(color="black", width=1)))
-        fig_updated.update_layout(
-            barmode="stack",
-            xaxis_title="工程",
-            yaxis_title="時間",
-            showlegend=False,
-            height=600,
-            margin=dict(l=40, r=40, t=60, b=40)
-        )
+        fig_updated.update_layout(barmode="stack", xaxis_title="工程", yaxis_title="時間", showlegend=False, height=600)
         st.plotly_chart(fig_updated, use_container_width=True)
 
-    # Excelファイルをメモリ上に作成（元データと更新後データの両方を含む）
+    # Excel出力（ID・ラベル・色分けカテゴリを除外）
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df_original.to_excel(writer, sheet_name="元データ", index=False)
-        df.drop(columns=["色分けカテゴリ"]).to_excel(writer, sheet_name="更新後データ", index=False)
+        df.drop(columns=["ID", "ラベル", "色分けカテゴリ"]).to_excel(writer, sheet_name="更新後データ", index=False)
     buffer.seek(0)
 
     st.download_button("📥 Excelファイルをダウンロード（元データ＋更新後データ）", buffer, file_name="process_plan_combined.xlsx")
